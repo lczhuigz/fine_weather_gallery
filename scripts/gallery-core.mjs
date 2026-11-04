@@ -135,9 +135,11 @@ function partsToDate(parts) {
   return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
 }
 
-async function readExifDate(abs) {
+async function readExifDate(source) {
+  // 注意：source 传 Buffer 而不是路径，别让它自己去开文件句柄
+  // （Node 26 起，FileHandle 被 GC 回收会直接抛 ERR_INVALID_STATE）
   try {
-    const exif = await exifr.parse(abs, { pick: ['DateTimeOriginal', 'CreateDate', 'ModifyDate'] });
+    const exif = await exifr.parse(source, { pick: ['DateTimeOriginal', 'CreateDate', 'ModifyDate'] });
     const date = exif?.DateTimeOriginal ?? exif?.CreateDate ?? exif?.ModifyDate;
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
     return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() };
@@ -157,14 +159,8 @@ function parseLocationInfo(relativePath) {
 
 /* ---------------------------------------------------------------- 图片处理 */
 
-function hashFile(abs) {
-  return new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha256');
-    fs.createReadStream(abs)
-      .on('data', (chunk) => hash.update(chunk))
-      .on('end', () => resolve(hash.digest('hex').slice(0, 12)))
-      .on('error', reject);
-  });
+function hashBuffer(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 12);
 }
 
 async function imageSize(abs) {
@@ -255,10 +251,39 @@ export async function buildGallery(options = {}) {
       const ext = path.extname(abs);
       const stem = path.basename(abs, ext);
       const meta = config[rel] ?? {};
+      const previous = cache[rel];
+
+      const touchSame = !force
+        && previous?.size === stat.size
+        && previous?.mtimeMs === stat.mtimeMs;
+
+      // 内容没变就不读文件，直接复用上次算好的哈希
+      const hash = touchSame ? previous.hash : hashBuffer(await fsp.readFile(abs));
+
+      const thumbName = `${hash}.thumb.webp`;
+      const largeName = `${hash}.large.webp`;
+      const thumbPath = path.join(outputDir, thumbName);
+      const largePath = path.join(outputDir, largeName);
+
+      const cacheHit = !force
+        && touchSame
+        && previous.hash === hash
+        && fs.existsSync(thumbPath)
+        && fs.existsSync(largePath);
+
+      // 一次读进内存，hash / EXIF / sharp 共用同一个 Buffer：
+      // 既省 I/O，也不会留下没关的 FileHandle（Node 26 会因此直接报错）
+      let buffer = null;
+      const getBuffer = async () => {
+        if (!buffer) buffer = await fsp.readFile(abs);
+        return buffer;
+      };
 
       const { yearDir, locationFromPath } = parseLocationInfo(rel);
       const fmDate = parseDateParts(meta.date);
-      const exifDate = await readExifDate(abs);
+      const exifDate = touchSame && 'exif' in previous
+        ? previous.exif
+        : await readExifDate(await getBuffer());
       const nameDate = dateFromFileName(path.basename(abs, ext));
 
       // 显式 date > 目录年份 > EXIF 年份 > 文件名里的日期 > 文件时间
@@ -285,30 +310,16 @@ export async function buildGallery(options = {}) {
       const desc = (meta.desc ?? '').trim();
 
       // ---- 图片产物（按内容哈希缓存）----
-      const previous = cache[rel];
-      const hash = !force && previous && previous.size === stat.size && previous.mtimeMs === stat.mtimeMs
-        ? previous.hash
-        : await hashFile(abs);
-
-      const thumbName = `${hash}.thumb.webp`;
-      const largeName = `${hash}.large.webp`;
-      const thumbPath = path.join(outputDir, thumbName);
-      const largePath = path.join(outputDir, largeName);
-
-      const cacheHit = !force
-        && previous?.hash === hash
-        && fs.existsSync(thumbPath)
-        && fs.existsSync(largePath);
-
       let { width, height, blurHash } = cacheHit
         ? previous
-        : await imageSize(abs).then(async (size) => ({
-          ...size,
-          blurHash: await makeBlurHash(abs),
-        }));
+        : await (async () => {
+          const source = await getBuffer();
+          const size = await imageSize(source);
+          return { ...size, blurHash: await makeBlurHash(source) };
+        })();
 
       if (!cacheHit) {
-        await renderVariants(abs, { thumbPath, largePath });
+        await renderVariants(await getBuffer(), { thumbPath, largePath });
         regenerated += 1;
         if (regenerated % 10 === 0) log.info(`[gallery] 已处理 ${regenerated} 张…`);
       } else {
@@ -333,7 +344,7 @@ export async function buildGallery(options = {}) {
           large: `/generated/${largeName}`,
         },
         cacheItem: {
-          hash, size: stat.size, mtimeMs: stat.mtimeMs, width, height, blurHash,
+          hash, size: stat.size, mtimeMs: stat.mtimeMs, width, height, blurHash, exif: exifDate,
         },
       };
     } catch (error) {
