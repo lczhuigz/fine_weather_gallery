@@ -1,0 +1,48 @@
+{
+  "name": "fine-weather-gallery",
+  "type": "module",
+  "version": "1.1.0",
+  "private": true,
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "gallery": "node scripts/gallery-cli.mjs",
+    "gallery:force": "node scripts/gallery-cli.mjs --force",
+    "gallery:clean": "node scripts/gallery-cli.mjs --clean",
+    "dev": "node scripts/gallery-cli.mjs && vite",
+    "build": "node scripts/gallery-cli.mjs && vite build",
+    "preview": "vite preview",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix"
+  },
+  "devDependencies": {
+    "@fingerprintjs/fingerprintjs": "^4.6.2",
+    "@iconify-json/mdi": "^1.2.3",
+    "@unocss/transformer-directives": "^0.53.6",
+    "@vitejs/plugin-vue": "^4.6.2",
+    "@vueuse/core": "^9.13.0",
+    "animate.css": "^4.1.1",
+    "blurhash": "^2.0.5",
+    "emoji-reaction": "^2.1.1",
+    "eslint": "^8.57.1",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-import-resolver-alias": "^1.1.2",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-vue": "^9.33.0",
+    "exifr": "^7.1.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "oxfmt": "^0.23.0",
+    "oxlint": "^1.59.0",
+    "sharp": "^0.33.5",
+    "unocss": "^0.53.6",
+    "vite": "^4.5.14",
+    "vue": "^3.5.32"
+  },
+  "lint-staged": {
+    "*.{js,mjs,vue}": "oxlint --fix"
+  }
+}

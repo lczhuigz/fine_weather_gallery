@@ -1,0 +1,14 @@
+# pnpm 的配置都写在这里（pnpm 11+ 不再读 package.json 里的 pnpm 字段）。
+#
+# 依赖的安装脚本默认不执行，sharp / esbuild 需要跑自己的 postinstall
+# 来准备原生二进制，所以显式放行。不放行的话 pnpm 会以
+# ERR_PNPM_IGNORED_BUILDS 直接失败（Vercel 上同样会挂）。
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - vue-demi
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  vue-demi: true

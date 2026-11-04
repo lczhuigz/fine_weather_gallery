@@ -1,0 +1,37 @@
+# 构建期生成的相册产物（缩略图 / 大图 / manifest），不进版本库
+/public/generated/
+
+# 图片处理缓存
+/.cache/
+
+# 依赖 / 构建产物
+node_modules
+dist
+dist-ssr
+*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+.env
+.env.*
+!.env.example
+.eslintcache
