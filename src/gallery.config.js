@@ -20,7 +20,7 @@ export default {
   defaultBranch: 'main',
 
   /** 首屏一次性渲染多少张，点 More 继续加载 */
-  pageSize: 20,
+  pageSize: 40,
 
   reactions: {
     /**
